@@ -1,23 +1,32 @@
-//! By convention, root.zig is the root source file when making a library.
+//! Zledger - A Lightweight Ledger Engine in Zig
 const std = @import("std");
 
+pub const tx = @import("tx.zig");
+pub const account = @import("account.zig");
+pub const journal = @import("journal.zig");
+pub const audit = @import("audit.zig");
+pub const cli = @import("cli.zig");
+pub const fixed_point = @import("fixed_point.zig");
+
+pub const Transaction = tx.Transaction;
+pub const Account = account.Account;
+pub const AccountType = account.AccountType;
+pub const Ledger = account.Ledger;
+pub const Journal = journal.Journal;
+pub const JournalEntry = journal.JournalEntry;
+pub const Auditor = audit.Auditor;
+pub const AuditReport = audit.AuditReport;
+pub const Cli = cli.Cli;
+pub const FixedPoint = fixed_point.FixedPoint;
+
 pub fn advancedPrint() !void {
-    // Stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
+    try stdout.print("Zledger - Lightweight Ledger Engine\n", .{});
     try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    try stdout.print("Use `zledger --help` for CLI usage.\n", .{});
 
-    try bw.flush(); // Don't forget to flush!
-}
-
-pub fn add(a: i32, b: i32) i32 {
-    return a + b;
-}
-
-test "basic add functionality" {
-    try std.testing.expect(add(3, 7) == 10);
+    try bw.flush();
 }
