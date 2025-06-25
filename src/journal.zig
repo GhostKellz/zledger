@@ -1,6 +1,8 @@
 const std = @import("std");
 const tx = @import("tx.zig");
 const crypto = std.crypto;
+const crypto_storage = @import("crypto_storage.zig");
+const zcrypto = @import("zcrypto");
 
 pub const JournalEntry = struct {
     transaction: tx.Transaction,
@@ -21,7 +23,7 @@ pub const JournalEntry = struct {
 
     pub fn verify(self: JournalEntry, allocator: std.mem.Allocator) !bool {
         const expected_hash = try calculateEntryHash(allocator, self.transaction, self.prev_hash, self.sequence);
-        return std.mem.eql(u8, &self.hash, &expected_hash);
+        return zcrypto.util.constantTimeCompare(&self.hash, &expected_hash);
     }
 };
 
@@ -101,7 +103,7 @@ pub const Journal = struct {
             
             if (i > 0) {
                 const prev_entry = self.entries.items[i - 1];
-                if (entry.prev_hash == null or !std.mem.eql(u8, &(entry.prev_hash.?), &prev_entry.hash)) {
+                if (entry.prev_hash == null or !zcrypto.util.constantTimeCompare(&(entry.prev_hash.?), &prev_entry.hash)) {
                     return false;
                 }
             } else {
@@ -164,6 +166,40 @@ pub const Journal = struct {
         try file.writeAll(json);
         try file.writeAll("\n");
     }
+
+    pub fn saveToEncryptedFile(self: *Journal, file_path: []const u8, password: []const u8) !void {
+        var secure_file = try crypto_storage.SecureFile.init(self.allocator, file_path, password);
+        defer secure_file.deinit();
+
+        var journal_data = std.ArrayList(u8).init(self.allocator);
+        defer journal_data.deinit();
+
+        for (self.entries.items) |entry| {
+            const json = try entry.transaction.toJson(self.allocator);
+            defer self.allocator.free(json);
+            
+            try journal_data.appendSlice(json);
+            try journal_data.append('\n');
+        }
+
+        try secure_file.save(journal_data.items);
+    }
+
+    pub fn loadFromEncryptedFile(self: *Journal, file_path: []const u8, password: []const u8) !void {
+        var secure_file = try crypto_storage.SecureFile.init(self.allocator, file_path, password);
+        defer secure_file.deinit();
+
+        const content = try secure_file.load();
+        defer self.allocator.free(content);
+
+        var lines = std.mem.splitSequence(u8, content, "\n");
+        while (lines.next()) |line| {
+            if (line.len == 0) continue;
+            
+            const transaction = try tx.Transaction.fromJson(self.allocator, line);
+            try self.append(transaction);
+        }
+    }
 };
 
 fn calculateEntryHash(allocator: std.mem.Allocator, transaction: tx.Transaction, prev_hash: ?[32]u8, sequence: u64) ![32]u8 {
@@ -206,7 +242,7 @@ test "journal operations" {
     const second_entry = journal.getEntry(1).?;
     try std.testing.expectEqual(@as(u64, 1), second_entry.sequence);
     try std.testing.expect(second_entry.prev_hash != null);
-    try std.testing.expect(std.mem.eql(u8, &(second_entry.prev_hash.?), &first_entry.hash));
+    try std.testing.expect(zcrypto.util.constantTimeCompare(&(second_entry.prev_hash.?), &first_entry.hash));
 }
 
 test "journal file persistence" {
