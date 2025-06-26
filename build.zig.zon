@@ -33,8 +33,8 @@
     // internet connectivity.
     .dependencies = .{
         .zcrypto = .{
-            .url = "https://github.com/ghostchain/zcrypto/archive/refs/tags/v0.2.0.tar.gz",
-            .hash = "1220c2e7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7",
+            .url = "https://github.com/ghostkellz/zcrypto/archive/refs/heads/main.tar.gz",
+            .hash = "zcrypto-0.0.0-rgQAI8fbAwClmk2Me7c0fNLBtFWbukRh3ZgB2_IckfYz",
         },
         // See `zig fetch --save <url>` for a command-line interface for adding dependencies.
         //.example = .{
