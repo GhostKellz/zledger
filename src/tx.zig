@@ -13,6 +13,7 @@ pub const Transaction = struct {
     signature: ?[64]u8,
     integrity_hmac: ?[32]u8,
     nonce: [12]u8,
+    depends_on: ?[]const u8,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -21,6 +22,18 @@ pub const Transaction = struct {
         from_account: []const u8,
         to_account: []const u8,
         memo: ?[]const u8,
+    ) !Transaction {
+        return initWithDependency(allocator, amount, currency, from_account, to_account, memo, null);
+    }
+
+    pub fn initWithDependency(
+        allocator: std.mem.Allocator,
+        amount: i64,
+        currency: []const u8,
+        from_account: []const u8,
+        to_account: []const u8,
+        memo: ?[]const u8,
+        depends_on: ?[]const u8,
     ) !Transaction {
         const timestamp = std.time.timestamp();
         const id = try generateTxId(allocator, timestamp, from_account, to_account, amount);
@@ -39,6 +52,7 @@ pub const Transaction = struct {
             .signature = null,
             .integrity_hmac = null,
             .nonce = nonce,
+            .depends_on = if (depends_on) |dep| try allocator.dupe(u8, dep) else null,
         };
     }
 
@@ -49,6 +63,9 @@ pub const Transaction = struct {
         allocator.free(self.to_account);
         if (self.memo) |memo| {
             allocator.free(memo);
+        }
+        if (self.depends_on) |dep| {
+            allocator.free(dep);
         }
     }
 
@@ -90,6 +107,12 @@ pub const Transaction = struct {
             try json_obj.put("integrity_hmac", std.json.Value.null);
         }
 
+        if (self.depends_on) |dep| {
+            try json_obj.put("depends_on", std.json.Value{ .string = dep });
+        } else {
+            try json_obj.put("depends_on", std.json.Value.null);
+        }
+
         const json_value = std.json.Value{ .object = json_obj };
         return try std.json.stringifyAlloc(allocator, json_value, .{});
     }
@@ -114,6 +137,13 @@ pub const Transaction = struct {
             }
         }
 
+        var depends_on: ?[]u8 = null;
+        if (obj.get("depends_on")) |dep_value| {
+            if (dep_value != .null) {
+                depends_on = try allocator.dupe(u8, dep_value.string);
+            }
+        }
+
         return Transaction{
             .id = id,
             .timestamp = timestamp,
@@ -125,6 +155,7 @@ pub const Transaction = struct {
             .signature = null,
             .integrity_hmac = null,
             .nonce = [_]u8{0} ** 12,
+            .depends_on = depends_on,
         };
     }
 
@@ -173,6 +204,22 @@ pub const Transaction = struct {
         return zcrypto.util.constantTimeCompare(&self.integrity_hmac.?, &computed_hmac);
     }
 
+    pub fn hasDependency(self: Transaction) bool {
+        return self.depends_on != null;
+    }
+
+    pub fn getDependency(self: Transaction) ?[]const u8 {
+        return self.depends_on;
+    }
+
+    pub fn validateDependencies(self: Transaction, processed_transactions: *const std.HashMap([]const u8, void, std.hash_map.StringContext, std.hash_map.default_max_load_percentage)) !void {
+        if (self.depends_on) |dep_id| {
+            if (!processed_transactions.contains(dep_id)) {
+                return error.DependencyNotFound;
+            }
+        }
+    }
+
     fn getTransactionDataForSigning(self: Transaction, allocator: std.mem.Allocator) ![]u8 {
         return try std.fmt.allocPrint(allocator, "{d}|{d}|{s}|{s}|{s}|{s}|{x}", 
             .{ self.timestamp, self.amount, self.currency, self.from_account, 
@@ -213,4 +260,81 @@ test "transaction creation and serialization" {
     try std.testing.expectEqual(tx.amount, tx2.amount);
     try std.testing.expectEqualStrings(tx.from_account, tx2.from_account);
     try std.testing.expectEqualStrings(tx.to_account, tx2.to_account);
+}
+
+test "transaction dependency tracking" {
+    const account = @import("account.zig");
+    
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var ledger = account.Ledger.init(allocator);
+    defer ledger.deinit();
+
+    // Create test accounts
+    try ledger.createAccount("alice", .asset, "USD");
+    try ledger.createAccount("bob", .asset, "USD");
+
+    // Create first transaction (no dependency)
+    var tx1 = try Transaction.init(allocator, 100, "USD", "alice", "bob", "First transaction");
+    defer tx1.deinit(allocator);
+
+    // Create second transaction that depends on first
+    var tx2 = try Transaction.initWithDependency(allocator, 50, "USD", "bob", "alice", "Second transaction", tx1.id);
+    defer tx2.deinit(allocator);
+
+    // Process first transaction should succeed
+    try ledger.processTransaction(tx1);
+    try std.testing.expect(ledger.isTransactionProcessed(tx1.id));
+
+    // Process second transaction should succeed (dependency satisfied)
+    try ledger.processTransaction(tx2);
+    try std.testing.expect(ledger.isTransactionProcessed(tx2.id));
+}
+
+test "transaction dependency validation fails" {
+    const account = @import("account.zig");
+    
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var ledger = account.Ledger.init(allocator);
+    defer ledger.deinit();
+
+    // Create test accounts
+    try ledger.createAccount("alice", .asset, "USD");
+    try ledger.createAccount("bob", .asset, "USD");
+
+    // Create transaction with dependency that doesn't exist
+    var tx = try Transaction.initWithDependency(allocator, 100, "USD", "alice", "bob", "Dependent transaction", "nonexistent_tx_id");
+    defer tx.deinit(allocator);
+
+    // Should fail with DependencyNotFound
+    try std.testing.expectError(error.DependencyNotFound, ledger.processTransaction(tx));
+}
+
+test "transaction dependency JSON serialization" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Create transaction with dependency
+    var tx = try Transaction.initWithDependency(allocator, 100, "USD", "alice", "bob", "Test transaction", "parent_tx_id");
+    defer tx.deinit(allocator);
+
+    // Test JSON serialization includes dependency
+    const json = try tx.toJson(allocator);
+    defer allocator.free(json);
+
+    try std.testing.expect(std.mem.indexOf(u8, json, "depends_on") != null);
+    try std.testing.expect(std.mem.indexOf(u8, json, "parent_tx_id") != null);
+
+    // Test round-trip serialization
+    var tx_restored = try Transaction.fromJson(allocator, json);
+    defer tx_restored.deinit(allocator);
+
+    try std.testing.expect(tx_restored.depends_on != null);
+    try std.testing.expectEqualStrings("parent_tx_id", tx_restored.depends_on.?);
 }

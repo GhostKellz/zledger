@@ -48,11 +48,13 @@ pub const Account = struct {
 
 pub const Ledger = struct {
     accounts: std.HashMap([]const u8, Account, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
+    processed_transactions: std.HashMap([]const u8, void, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) Ledger {
         return Ledger{
             .accounts = std.HashMap([]const u8, Account, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
+            .processed_transactions = std.HashMap([]const u8, void, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .allocator = allocator,
         };
     }
@@ -64,6 +66,12 @@ pub const Ledger = struct {
             account.deinit(self.allocator);
         }
         self.accounts.deinit();
+        
+        var tx_iterator = self.processed_transactions.iterator();
+        while (tx_iterator.next()) |entry| {
+            self.allocator.free(entry.key_ptr.*);
+        }
+        self.processed_transactions.deinit();
     }
 
     pub fn createAccount(self: *Ledger, name: []const u8, account_type: AccountType, currency: []const u8) !void {
@@ -88,6 +96,9 @@ pub const Ledger = struct {
     }
 
     pub fn processTransaction(self: *Ledger, transaction: tx.Transaction) !void {
+        // Validate transaction dependencies first
+        try transaction.validateDependencies(&self.processed_transactions);
+        
         var from_account = self.getAccount(transaction.from_account) orelse return error.FromAccountNotFound;
         var to_account = self.getAccount(transaction.to_account) orelse return error.ToAccountNotFound;
 
@@ -98,6 +109,14 @@ pub const Ledger = struct {
 
         from_account.credit(transaction.amount);
         to_account.debit(transaction.amount);
+        
+        // Mark transaction as processed
+        const tx_id = try self.allocator.dupe(u8, transaction.id);
+        try self.processed_transactions.put(tx_id, {});
+    }
+
+    pub fn isTransactionProcessed(self: *const Ledger, transaction_id: []const u8) bool {
+        return self.processed_transactions.contains(transaction_id);
     }
 
     pub fn verifyDoubleEntry(self: *Ledger) bool {
