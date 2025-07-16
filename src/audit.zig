@@ -272,6 +272,108 @@ pub const Auditor = struct {
     }
 };
 
+pub const AuditProofChain = struct {
+    entries: std.ArrayList(AuditEntry),
+    chain_hash: [32]u8,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) AuditProofChain {
+        return AuditProofChain{
+            .entries = std.ArrayList(AuditEntry).init(allocator),
+            .chain_hash = std.mem.zeroes([32]u8),
+            .allocator = allocator,
+        };
+    }
+
+    pub fn deinit(self: *AuditProofChain) void {
+        for (self.entries.items) |*entry| {
+            entry.deinit(self.allocator);
+        }
+        self.entries.deinit();
+    }
+
+    pub fn addEntry(self: *AuditProofChain, event_type: AuditEventType, data: []const u8) !void {
+        const entry = try AuditEntry.init(self.allocator, event_type, data, self.chain_hash);
+        self.chain_hash = entry.hash;
+        try self.entries.append(entry);
+    }
+
+    pub fn verifyChainIntegrity(self: *AuditProofChain) bool {
+        var previous_hash = std.mem.zeroes([32]u8);
+        
+        for (self.entries.items) |entry| {
+            if (!std.mem.eql(u8, &entry.previous_hash, &previous_hash)) {
+                return false;
+            }
+            previous_hash = entry.hash;
+        }
+        
+        return std.mem.eql(u8, &self.chain_hash, &previous_hash);
+    }
+};
+
+pub const AuditEventType = enum {
+    transaction_processed,
+    transaction_rolled_back,
+    account_created,
+    asset_registered,
+    balance_updated,
+    system_checkpoint,
+};
+
+pub const AuditEntry = struct {
+    timestamp: i64,
+    event_type: AuditEventType,
+    data: []const u8,
+    previous_hash: [32]u8,
+    hash: [32]u8,
+
+    pub fn init(allocator: std.mem.Allocator, event_type: AuditEventType, data: []const u8, previous_hash: [32]u8) !AuditEntry {
+        const timestamp = std.time.timestamp();
+        const owned_data = try allocator.dupe(u8, data);
+        
+        // Calculate hash of this entry
+        var hash_input = std.ArrayList(u8).init(allocator);
+        defer hash_input.deinit();
+        
+        try hash_input.appendSlice(std.mem.asBytes(&timestamp));
+        try hash_input.appendSlice(std.mem.asBytes(&event_type));
+        try hash_input.appendSlice(owned_data);
+        try hash_input.appendSlice(&previous_hash);
+        
+        var hash: [32]u8 = undefined;
+        std.crypto.hash.sha2.Sha256.hash(hash_input.items, &hash, .{});
+        
+        return AuditEntry{
+            .timestamp = timestamp,
+            .event_type = event_type,
+            .data = owned_data,
+            .previous_hash = previous_hash,
+            .hash = hash,
+        };
+    }
+
+    pub fn deinit(self: *AuditEntry, allocator: std.mem.Allocator) void {
+        allocator.free(self.data);
+    }
+
+    pub fn verify(self: *AuditEntry) bool {
+        // Recalculate hash and verify
+        var hash_input = std.ArrayList(u8).init(std.heap.page_allocator);
+        defer hash_input.deinit();
+        
+        hash_input.appendSlice(std.mem.asBytes(&self.timestamp)) catch return false;
+        hash_input.appendSlice(std.mem.asBytes(&self.event_type)) catch return false;
+        hash_input.appendSlice(self.data) catch return false;
+        hash_input.appendSlice(&self.previous_hash) catch return false;
+        
+        var calculated_hash: [32]u8 = undefined;
+        std.crypto.hash.sha2.Sha256.hash(hash_input.items, &calculated_hash, .{});
+        
+        return std.mem.eql(u8, &self.hash, &calculated_hash);
+    }
+};
+
 test "audit basic ledger operations" {
     const allocator = std.testing.allocator;
     

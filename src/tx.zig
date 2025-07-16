@@ -37,10 +37,10 @@ pub const Transaction = struct {
     ) !Transaction {
         const timestamp = std.time.timestamp();
         const id = try generateTxId(allocator, timestamp, from_account, to_account, amount);
-        
+
         var nonce: [12]u8 = undefined;
         zcrypto.rand.fillBytes(&nonce);
-        
+
         return Transaction{
             .id = id,
             .timestamp = timestamp,
@@ -79,7 +79,7 @@ pub const Transaction = struct {
         try json_obj.put("currency", std.json.Value{ .string = self.currency });
         try json_obj.put("from_account", std.json.Value{ .string = self.from_account });
         try json_obj.put("to_account", std.json.Value{ .string = self.to_account });
-        
+
         if (self.memo) |memo| {
             try json_obj.put("memo", std.json.Value{ .string = memo });
         } else {
@@ -122,14 +122,14 @@ pub const Transaction = struct {
         defer parsed.deinit();
 
         const obj = parsed.value.object;
-        
+
         const id = try allocator.dupe(u8, obj.get("id").?.string);
         const timestamp = obj.get("timestamp").?.integer;
         const amount = obj.get("amount").?.integer;
         const currency = try allocator.dupe(u8, obj.get("currency").?.string);
         const from_account = try allocator.dupe(u8, obj.get("from_account").?.string);
         const to_account = try allocator.dupe(u8, obj.get("to_account").?.string);
-        
+
         var memo: ?[]u8 = null;
         if (obj.get("memo")) |memo_value| {
             if (memo_value != .null) {
@@ -162,7 +162,7 @@ pub const Transaction = struct {
     pub fn getHash(self: Transaction, allocator: std.mem.Allocator) ![32]u8 {
         const tx_data = try self.toJson(allocator);
         defer allocator.free(tx_data);
-        
+
         var hash: [32]u8 = undefined;
         crypto.hash.sha2.Sha256.hash(tx_data, &hash, .{});
         return hash;
@@ -171,7 +171,7 @@ pub const Transaction = struct {
     pub fn signTransaction(self: *Transaction, allocator: std.mem.Allocator) !void {
         const tx_data = try self.getTransactionDataForSigning(allocator);
         defer allocator.free(tx_data);
-        
+
         const keypair = zcrypto.asym.ed25519.generate();
         const signature = keypair.sign(tx_data);
         self.signature = signature;
@@ -179,10 +179,10 @@ pub const Transaction = struct {
 
     pub fn verifySignature(self: Transaction, allocator: std.mem.Allocator, public_key: [32]u8) !bool {
         if (self.signature == null) return false;
-        
+
         const tx_data = try self.getTransactionDataForSigning(allocator);
         defer allocator.free(tx_data);
-        
+
         const keypair = zcrypto.asym.ed25519.KeyPair{ .public_key = public_key, .private_key = undefined };
         return keypair.verify(tx_data, self.signature.?);
     }
@@ -190,16 +190,16 @@ pub const Transaction = struct {
     pub fn generateIntegrityHMAC(self: *Transaction, allocator: std.mem.Allocator, hmac_key: [32]u8) !void {
         const tx_data = try self.getTransactionDataForSigning(allocator);
         defer allocator.free(tx_data);
-        
+
         self.integrity_hmac = zcrypto.auth.hmac.sha256(tx_data, &hmac_key);
     }
 
     pub fn verifyIntegrityHMAC(self: Transaction, allocator: std.mem.Allocator, hmac_key: [32]u8) !bool {
         if (self.integrity_hmac == null) return false;
-        
+
         const tx_data = try self.getTransactionDataForSigning(allocator);
         defer allocator.free(tx_data);
-        
+
         const computed_hmac = zcrypto.auth.hmac.sha256(tx_data, &hmac_key);
         return zcrypto.util.constantTimeCompare(&self.integrity_hmac.?, &computed_hmac);
     }
@@ -221,33 +221,24 @@ pub const Transaction = struct {
     }
 
     fn getTransactionDataForSigning(self: Transaction, allocator: std.mem.Allocator) ![]u8 {
-        return try std.fmt.allocPrint(allocator, "{d}|{d}|{s}|{s}|{s}|{s}|{x}", 
-            .{ self.timestamp, self.amount, self.currency, self.from_account, 
-               self.to_account, self.memo orelse "", self.nonce });
+        return try std.fmt.allocPrint(allocator, "{d}|{d}|{s}|{s}|{s}|{s}|{x}", .{ self.timestamp, self.amount, self.currency, self.from_account, self.to_account, self.memo orelse "", self.nonce });
     }
 };
 
 fn generateTxId(allocator: std.mem.Allocator, timestamp: i64, from: []const u8, to: []const u8, amount: i64) ![]u8 {
     const id_data = try std.fmt.allocPrint(allocator, "{d}-{s}-{s}-{d}", .{ timestamp, from, to, amount });
     defer allocator.free(id_data);
-    
+
     var hash: [32]u8 = undefined;
     crypto.hash.sha2.Sha256.hash(id_data, &hash, .{});
-    
+
     return try std.fmt.allocPrint(allocator, "{x}", .{hash[0..8]});
 }
 
 test "transaction creation and serialization" {
     const allocator = std.testing.allocator;
-    
-    var tx = try Transaction.init(
-        allocator,
-        100000,
-        "USD",
-        "alice",
-        "bob",
-        "Test payment"
-    );
+
+    var tx = try Transaction.init(allocator, 100000, "USD", "alice", "bob", "Test payment");
     defer tx.deinit(allocator);
 
     const json = try tx.toJson(allocator);
@@ -264,7 +255,7 @@ test "transaction creation and serialization" {
 
 test "transaction dependency tracking" {
     const account = @import("account.zig");
-    
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
@@ -295,7 +286,7 @@ test "transaction dependency tracking" {
 
 test "transaction dependency validation fails" {
     const account = @import("account.zig");
-    
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();

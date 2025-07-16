@@ -1,5 +1,6 @@
 const std = @import("std");
 const tx = @import("tx.zig");
+const asset = @import("asset.zig");
 
 pub const AccountType = enum {
     asset,
@@ -49,12 +50,16 @@ pub const Account = struct {
 pub const Ledger = struct {
     accounts: std.HashMap([]const u8, Account, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
     processed_transactions: std.HashMap([]const u8, void, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
+    transaction_snapshots: std.HashMap([]const u8, TransactionSnapshot, std.hash_map.StringContext, std.hash_map.default_max_load_percentage),
+    asset_registry: asset.AssetRegistry,
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) Ledger {
         return Ledger{
             .accounts = std.HashMap([]const u8, Account, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .processed_transactions = std.HashMap([]const u8, void, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
+            .transaction_snapshots = std.HashMap([]const u8, TransactionSnapshot, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
+            .asset_registry = asset.AssetRegistry.init(allocator),
             .allocator = allocator,
         };
     }
@@ -66,7 +71,7 @@ pub const Ledger = struct {
             account.deinit(self.allocator);
         }
         self.accounts.deinit();
-        
+
         var tx_iterator = self.processed_transactions.iterator();
         while (tx_iterator.next()) |entry| {
             self.allocator.free(entry.key_ptr.*);
@@ -98,21 +103,71 @@ pub const Ledger = struct {
     pub fn processTransaction(self: *Ledger, transaction: tx.Transaction) !void {
         // Validate transaction dependencies first
         try transaction.validateDependencies(&self.processed_transactions);
-        
+
+        // Validate asset rules
+        try self.asset_registry.validateAssetTransaction(transaction.currency, transaction.amount);
+
         var from_account = self.getAccount(transaction.from_account) orelse return error.FromAccountNotFound;
         var to_account = self.getAccount(transaction.to_account) orelse return error.ToAccountNotFound;
 
         if (!std.mem.eql(u8, from_account.currency, transaction.currency) or
-            !std.mem.eql(u8, to_account.currency, transaction.currency)) {
+            !std.mem.eql(u8, to_account.currency, transaction.currency))
+        {
             return error.CurrencyMismatch;
         }
 
         from_account.credit(transaction.amount);
         to_account.debit(transaction.amount);
-        
+
         // Mark transaction as processed
         const tx_id = try self.allocator.dupe(u8, transaction.id);
         try self.processed_transactions.put(tx_id, {});
+    }
+
+    pub fn processTransactionWithRollback(self: *Ledger, transaction: tx.Transaction) !void {
+        // Create snapshot before processing
+        const from_account = self.getAccount(transaction.from_account) orelse return error.FromAccountNotFound;
+        const to_account = self.getAccount(transaction.to_account) orelse return error.ToAccountNotFound;
+        
+        const affected_accounts = [_]*const Account{ from_account, to_account };
+        const snapshot = try TransactionSnapshot.init(self.allocator, transaction.id, &affected_accounts);
+        
+        // Store snapshot
+        try self.transaction_snapshots.put(try self.allocator.dupe(u8, transaction.id), snapshot);
+        
+        // Process transaction normally
+        self.processTransaction(transaction) catch |err| {
+            // Rollback on failure
+            try self.rollbackTransaction(transaction.id);
+            return err;
+        };
+    }
+
+    pub fn rollbackTransaction(self: *Ledger, transaction_id: []const u8) !void {
+        const snapshot = self.transaction_snapshots.get(transaction_id) orelse return error.SnapshotNotFound;
+        
+        // Restore account balances
+        for (snapshot.account_snapshots) |account_snapshot| {
+            if (self.getAccount(account_snapshot.name)) |account| {
+                account.balance = account_snapshot.balance;
+            }
+        }
+        
+        // Remove from processed transactions
+        if (self.processed_transactions.getPtr(transaction_id)) |_| {
+            _ = self.processed_transactions.remove(transaction_id);
+        }
+        
+        std.log.info("Transaction {} rolled back successfully", .{transaction_id});
+    }
+
+    pub fn commitTransaction(self: *Ledger, transaction_id: []const u8) !void {
+        // Remove snapshot as transaction is now committed
+        if (self.transaction_snapshots.getPtr(transaction_id)) |snapshot| {
+            var snapshot_mut = snapshot;
+            snapshot_mut.deinit();
+            _ = self.transaction_snapshots.remove(transaction_id);
+        }
     }
 
     pub fn isTransactionProcessed(self: *const Ledger, transaction_id: []const u8) bool {
@@ -143,7 +198,7 @@ pub const Ledger = struct {
 
     pub fn getTrialBalance(self: *Ledger, allocator: std.mem.Allocator) !std.ArrayList(TrialBalanceEntry) {
         var trial_balance = std.ArrayList(TrialBalanceEntry).init(allocator);
-        
+
         var iterator = self.accounts.iterator();
         while (iterator.next()) |entry| {
             const account = entry.value_ptr;
@@ -171,9 +226,54 @@ pub const TrialBalanceEntry = struct {
     }
 };
 
+pub const AccountSnapshot = struct {
+    name: []const u8,
+    balance: i64,
+
+    pub fn init(allocator: std.mem.Allocator, account: *const Account) !AccountSnapshot {
+        return AccountSnapshot{
+            .name = try allocator.dupe(u8, account.name),
+            .balance = account.balance,
+        };
+    }
+
+    pub fn deinit(self: *AccountSnapshot, allocator: std.mem.Allocator) void {
+        allocator.free(self.name);
+    }
+};
+
+pub const TransactionSnapshot = struct {
+    transaction_id: []const u8,
+    account_snapshots: []AccountSnapshot,
+    timestamp: i64,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator, transaction_id: []const u8, affected_accounts: []*const Account) !TransactionSnapshot {
+        var snapshots = try allocator.alloc(AccountSnapshot, affected_accounts.len);
+        for (affected_accounts, 0..) |account, i| {
+            snapshots[i] = try AccountSnapshot.init(allocator, account);
+        }
+
+        return TransactionSnapshot{
+            .transaction_id = try allocator.dupe(u8, transaction_id),
+            .account_snapshots = snapshots,
+            .timestamp = std.time.timestamp(),
+            .allocator = allocator,
+        };
+    }
+
+    pub fn deinit(self: *TransactionSnapshot) void {
+        for (self.account_snapshots) |*snapshot| {
+            snapshot.deinit(self.allocator);
+        }
+        self.allocator.free(self.account_snapshots);
+        self.allocator.free(self.transaction_id);
+    }
+};
+
 test "account creation and balance operations" {
     const allocator = std.testing.allocator;
-    
+
     var ledger = Ledger.init(allocator);
     defer ledger.deinit();
 
@@ -193,7 +293,7 @@ test "account creation and balance operations" {
 
 test "transaction processing" {
     const allocator = std.testing.allocator;
-    
+
     var ledger = Ledger.init(allocator);
     defer ledger.deinit();
 
@@ -210,4 +310,32 @@ test "transaction processing" {
 
     try std.testing.expectEqual(@as(i64, 50000), alice.balance);
     try std.testing.expectEqual(@as(i64, 50000), ledger.getAccount("bob").?.balance);
+}
+
+test "transaction processing with rollback" {
+    const allocator = std.testing.allocator;
+
+    var ledger = Ledger.init(allocator);
+    defer ledger.deinit();
+
+    try ledger.createAccount("charlie", .asset, "USD");
+    try ledger.createAccount("dave", .asset, "USD");
+
+    const charlie = ledger.getAccount("charlie").?;
+    charlie.debit(100000);
+
+    var transaction = try tx.Transaction.init(allocator, 50000, "USD", "charlie", "dave", "Payment to Dave");
+    defer transaction.deinit(allocator);
+
+    // Process transaction with rollback
+    try ledger.processTransactionWithRollback(transaction);
+
+    try std.testing.expectEqual(@as(i64, 50000), charlie.balance);
+    try std.testing.expectEqual(@as(i64, 50000), ledger.getAccount("dave").?.balance);
+
+    // Rollback the transaction
+    try ledger.rollbackTransaction(transaction.id);
+
+    try std.testing.expectEqual(@as(i64, 100000), charlie.balance);
+    try std.testing.expectEqual(@as(i64, 0), ledger.getAccount("dave").?.balance);
 }

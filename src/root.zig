@@ -10,11 +10,15 @@ pub const fixed_point = @import("fixed_point.zig");
 pub const crypto_storage = @import("crypto_storage.zig");
 pub const zwallet_integration = @import("zwallet_integration.zig");
 pub const contract = @import("contract.zig");
+pub const merkle = @import("merkle.zig");
+pub const asset = @import("asset.zig");
 
-// Comprehensive crypto tests
+// Comprehensive tests
 test {
     _ = @import("crypto_tests.zig");
     _ = @import("contract.zig");
+    _ = @import("merkle.zig");
+    _ = @import("asset.zig");
 }
 
 pub const Transaction = tx.Transaction;

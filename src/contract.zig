@@ -246,6 +246,68 @@ pub const Contract = struct {
     }
 };
 
+pub const ContractEvent = struct {
+    contract_address: ContractAddress,
+    event_type: ContractEventType,
+    data: []const u8,
+    gas_used: GasLimit,
+    timestamp: i64,
+
+    pub fn init(allocator: std.mem.Allocator, address: ContractAddress, event_type: ContractEventType, data: []const u8, gas_used: GasLimit) !ContractEvent {
+        return ContractEvent{
+            .contract_address = address,
+            .event_type = event_type,
+            .data = try allocator.dupe(u8, data),
+            .gas_used = gas_used,
+            .timestamp = std.time.timestamp(),
+        };
+    }
+
+    pub fn deinit(self: *ContractEvent, allocator: std.mem.Allocator) void {
+        allocator.free(self.data);
+    }
+};
+
+pub const ContractEventType = enum {
+    contract_created,
+    contract_executed,
+    contract_destroyed,
+    state_changed,
+    gas_consumed,
+};
+
+pub const ZVMIntegrationHooks = struct {
+    ledger: ?*anyopaque, // Pointer to Ledger
+    event_callback: ?*const fn (event: ContractEvent) void,
+
+    pub fn init() ZVMIntegrationHooks {
+        return ZVMIntegrationHooks{
+            .ledger = null,
+            .event_callback = null,
+        };
+    }
+
+    pub fn setLedger(self: *ZVMIntegrationHooks, ledger: *anyopaque) void {
+        self.ledger = ledger;
+    }
+
+    pub fn recordContractExecution(self: *ZVMIntegrationHooks, contract_address: ContractAddress, gas_used: GasLimit, success: bool) void {
+        // Create contract event record for ledger integration
+        _ = self;
+        _ = contract_address;
+        _ = gas_used;
+        _ = success;
+        // Implementation would create transaction record for gas fees
+    }
+
+    pub fn recordStateChange(self: *ZVMIntegrationHooks, contract_address: ContractAddress, state_hash: StateHash) void {
+        _ = self;
+        _ = contract_address;
+        _ = state_hash;
+        // Record state change in ledger audit trail
+    }
+};
+
 pub fn version() []const u8 {
     return "0.1.0";
 }

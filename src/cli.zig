@@ -217,6 +217,31 @@ pub const Cli = struct {
                     transaction.deinit(self.allocator);
                     return;
                 },
+                error.OutOfMemory => {
+                    std.debug.print("Out of memory\n", .{});
+                    transaction.deinit(self.allocator);
+                    return;
+                },
+                error.DependencyNotFound => {
+                    std.debug.print("Transaction dependency not found\n", .{});
+                    transaction.deinit(self.allocator);
+                    return;
+                },
+                error.AssetNotFound => {
+                    std.debug.print("Asset not found\n", .{});
+                    transaction.deinit(self.allocator);
+                    return;
+                },
+                error.AssetFrozen => {
+                    std.debug.print("Asset is frozen\n", .{});
+                    transaction.deinit(self.allocator);
+                    return;
+                },
+                error.TransactionAmountTooLarge => {
+                    std.debug.print("Transaction amount too large\n", .{});
+                    transaction.deinit(self.allocator);
+                    return;
+                },
             };
             
             try self.journal_ref.append(transaction);
