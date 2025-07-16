@@ -1,10 +1,16 @@
 # Zledger: A Lightweight Ledger Engine in Zig
 
+[![Zig v0.15+](https://img.shields.io/badge/zig-0.15+-f7a41d?logo=zig\&logoColor=white)](https://ziglang.org/)
+[![Pure Zig](https://img.shields.io/badge/pure-zig-success)]()
+[![Ledger Engine](https://img.shields.io/badge/type-ledger-blue)]()
+
+---
+
 ## 📌 Overview
 
 **Zledger** is a lightweight, performant, and embeddable ledger engine built in Zig. It's designed for use in financial applications, cryptocurrency accounting, blockchain wallets, and local transactional systems where performance and precision matter.
 
-Zledger aims to provide the foundational infrastructure for secure balance tracking, transaction journaling, double-entry accounting, and audit-ready systems.
+Zledger aims to provide the foundational infrastructure for secure balance tracking, transaction journaling, double-entry accounting, audit-ready systems, and programmable transaction constraints ("covenants")—now built directly into the engine.
 
 ---
 
@@ -15,6 +21,7 @@ Zledger aims to provide the foundational infrastructure for secure balance track
 * ✅ **Precision-first with no floating point leakage**
 * ✅ **Supports both single and double-entry models**
 * ✅ **Transaction chaining + integrity hashing**
+* ✅ **Built-in programmable constraints for custom rules**
 * ✅ **Built for CLI, WASM, or embedded systems**
 
 ---
@@ -49,7 +56,31 @@ Flat append-only journal to store TX logs with optional integrity hash per trans
 
 Includes tools for integrity checks, balance diffs, and transaction history verification.
 
-### 5. `zledger.cli`
+### 5. `zledger.rules`
+
+Built-in support for attaching programmable constraints (formerly "covenants") to transactions or accounts:
+
+* Custom transaction validation
+* Spending limits (per account, asset, or time)
+* Multi-signature/approval flows
+* Allow/block lists and KYC enforcement
+* Account- or transaction-level hooks for smart contract logic
+
+#### Example: Custom Validation Rule
+
+```zig
+const AllowlistRule = struct {
+    allowed: [][]const u8,
+    pub fn validate(self: @This(), tx: Transaction) !void {
+        if (!self.allowed.contains(tx.to_account)) return error.AccountNotAllowed;
+    }
+};
+
+// Register a rule with the ledger
+try zledger.rules.register(AllowlistRule{ .allowed = &[_][]const u8{"acct1", "acct2"} });
+```
+
+### 6. `zledger.cli`
 
 A simple CLI interface to run operations:
 
@@ -66,6 +97,7 @@ zledger balance user2
 * Fixed-point arithmetic using `i64` + `DECIMALS` (e.g. cents or micro-units)
 * Optional SHA256 for integrity chaining of transactions
 * No floats, no rounding errors, no surprises
+* Programmable constraints prevent invalid or unauthorized transactions
 
 ---
 
@@ -76,6 +108,7 @@ zledger balance user2
 * 🔐 Personal finance ledger in terminal
 * 🌐 WASM-based transaction tracker for web apps
 * 🧾 Audit trail system for smart contracts or DAOs
+* ⚡ On-ledger programmable rules and constraints
 
 ---
 
@@ -85,6 +118,7 @@ zledger balance user2
 * Zcash-style memo field support
 * Zsig-compatible signing of transactions
 * Export formats: CSV, JSON, and Merkle-tree snapshots
+* Pluggable scripting/interpreter for advanced rule logic
 
 ---
 
@@ -93,10 +127,4 @@ zledger balance user2
 MIT — Lightweight, auditable, and hacker-friendly.
 
 ---
-
-## 🤝 Related Projects
-
-* [`zwallet`](./zwallet.md) — Local and hardware wallet integration
-* [`zcrypto`](./zcrypto.md) — Zig cryptographic engine
-* [`ghostforge`](https://github.com/ghostkellz/ghostforge) — Rust crates.io clone for self-hosted registries
 

@@ -66,7 +66,7 @@ pub const AuditReport = struct {
         try json_obj.put("hmac_valid", std.json.Value{ .bool = self.hmac_valid });
         try json_obj.put("is_valid", std.json.Value{ .bool = self.isValid() });
         
-        const hmac_hex = try std.fmt.allocPrint(allocator, "{x}", .{std.fmt.fmtSliceHexLower(&self.audit_trail_hmac)});
+        const hmac_hex = try std.fmt.allocPrint(allocator, "{x}", .{self.audit_trail_hmac});
         defer allocator.free(hmac_hex);
         try json_obj.put("audit_trail_hmac", std.json.Value{ .string = hmac_hex });
 

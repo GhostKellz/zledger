@@ -146,7 +146,7 @@ pub const WalletInfo = struct {
     address: []const u8,
 
     pub fn fromKeypair(allocator: std.mem.Allocator, keypair: WalletKeypair) !WalletInfo {
-        const public_key_hex = try std.fmt.allocPrint(allocator, "{x}", .{std.fmt.fmtSliceHexLower(&keypair.public_key)});
+        const public_key_hex = try std.fmt.allocPrint(allocator, "{x}", .{keypair.public_key});
         
         // Generate address based on algorithm
         const address = switch (keypair.algorithm) {
@@ -172,7 +172,7 @@ fn generateEd25519Address(allocator: std.mem.Allocator, public_key: [32]u8) ![]u
     zcrypto.hash.sha256(&public_key, &hash);
     
     // Take first 20 bytes and encode as hex with prefix
-    return try std.fmt.allocPrint(allocator, "zl{x}", .{std.fmt.fmtSliceHexLower(hash[0..20])});
+    return try std.fmt.allocPrint(allocator, "zl{x}", .{hash[0..20]});
 }
 
 fn generateSecp256k1Address(allocator: std.mem.Allocator, public_key: [32]u8) ![]u8 {
@@ -180,7 +180,7 @@ fn generateSecp256k1Address(allocator: std.mem.Allocator, public_key: [32]u8) ![
     zcrypto.hash.sha256(&public_key, &hash);
     
     // Take first 20 bytes and encode as hex with Bitcoin-style prefix
-    return try std.fmt.allocPrint(allocator, "bc{x}", .{std.fmt.fmtSliceHexLower(hash[0..20])});
+    return try std.fmt.allocPrint(allocator, "bc{x}", .{hash[0..20]});
 }
 
 pub const HDWallet = struct {

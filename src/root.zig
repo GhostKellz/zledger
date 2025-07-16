@@ -9,10 +9,12 @@ pub const cli = @import("cli.zig");
 pub const fixed_point = @import("fixed_point.zig");
 pub const crypto_storage = @import("crypto_storage.zig");
 pub const zwallet_integration = @import("zwallet_integration.zig");
+pub const contract = @import("contract.zig");
 
 // Comprehensive crypto tests
 test {
-    @import("crypto_tests.zig");
+    _ = @import("crypto_tests.zig");
+    _ = @import("contract.zig");
 }
 
 pub const Transaction = tx.Transaction;
@@ -34,14 +36,17 @@ pub const WalletInfo = zwallet_integration.WalletInfo;
 pub const HDWallet = zwallet_integration.HDWallet;
 pub const SignatureAlgorithm = zwallet_integration.SignatureAlgorithm;
 
+// Embedded Smart Contract System
+pub const ContractError = contract.ContractError;
+pub const GasLimit = contract.GasLimit;
+pub const ContractAddress = contract.ContractAddress;
+pub const StateHash = contract.StateHash;
+pub const ContractState = contract.ContractState;
+pub const ExecutionContext = contract.ExecutionContext;
+pub const Contract = contract.Contract;
+
 pub fn advancedPrint() !void {
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try stdout.print("Zledger - Lightweight Ledger Engine\n", .{});
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
-    try stdout.print("Use `zledger --help` for CLI usage.\n", .{});
-
-    try bw.flush();
+    std.debug.print("Zledger - Lightweight Ledger Engine\n", .{});
+    std.debug.print("Run `zig build test` to run the tests.\n", .{});
+    std.debug.print("Use `zledger --help` for CLI usage.\n", .{});
 }

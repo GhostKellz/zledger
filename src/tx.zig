@@ -70,12 +70,12 @@ pub const Transaction = struct {
         }
 
         // Add cryptographic fields
-        const nonce_hex = try std.fmt.allocPrint(allocator, "{x}", .{std.fmt.fmtSliceHexLower(&self.nonce)});
+        const nonce_hex = try std.fmt.allocPrint(allocator, "{x}", .{self.nonce});
         defer allocator.free(nonce_hex);
         try json_obj.put("nonce", std.json.Value{ .string = nonce_hex });
 
         if (self.signature) |sig| {
-            const sig_hex = try std.fmt.allocPrint(allocator, "{x}", .{std.fmt.fmtSliceHexLower(&sig)});
+            const sig_hex = try std.fmt.allocPrint(allocator, "{x}", .{sig});
             defer allocator.free(sig_hex);
             try json_obj.put("signature", std.json.Value{ .string = sig_hex });
         } else {
@@ -83,7 +83,7 @@ pub const Transaction = struct {
         }
 
         if (self.integrity_hmac) |hmac| {
-            const hmac_hex = try std.fmt.allocPrint(allocator, "{x}", .{std.fmt.fmtSliceHexLower(&hmac)});
+            const hmac_hex = try std.fmt.allocPrint(allocator, "{x}", .{hmac});
             defer allocator.free(hmac_hex);
             try json_obj.put("integrity_hmac", std.json.Value{ .string = hmac_hex });
         } else {
@@ -122,6 +122,9 @@ pub const Transaction = struct {
             .from_account = from_account,
             .to_account = to_account,
             .memo = memo,
+            .signature = null,
+            .integrity_hmac = null,
+            .nonce = [_]u8{0} ** 12,
         };
     }
 
@@ -134,7 +137,7 @@ pub const Transaction = struct {
         return hash;
     }
 
-    pub fn signTransaction(self: *Transaction, allocator: std.mem.Allocator, private_key: [32]u8) !void {
+    pub fn signTransaction(self: *Transaction, allocator: std.mem.Allocator) !void {
         const tx_data = try self.getTransactionDataForSigning(allocator);
         defer allocator.free(tx_data);
         
@@ -173,7 +176,7 @@ pub const Transaction = struct {
     fn getTransactionDataForSigning(self: Transaction, allocator: std.mem.Allocator) ![]u8 {
         return try std.fmt.allocPrint(allocator, "{d}|{d}|{s}|{s}|{s}|{s}|{x}", 
             .{ self.timestamp, self.amount, self.currency, self.from_account, 
-               self.to_account, self.memo orelse "", std.fmt.fmtSliceHexLower(&self.nonce) });
+               self.to_account, self.memo orelse "", self.nonce });
     }
 };
 
@@ -184,7 +187,7 @@ fn generateTxId(allocator: std.mem.Allocator, timestamp: i64, from: []const u8, 
     var hash: [32]u8 = undefined;
     crypto.hash.sha2.Sha256.hash(id_data, &hash, .{});
     
-    return try std.fmt.allocPrint(allocator, "{x}", .{std.fmt.fmtSliceHexLower(hash[0..8])});
+    return try std.fmt.allocPrint(allocator, "{x}", .{hash[0..8]});
 }
 
 test "transaction creation and serialization" {
