@@ -20,7 +20,7 @@ pub const Cli = struct {
     pub fn init(allocator: std.mem.Allocator, data_dir: []const u8) !Cli {
         const ledger_path = try std.fmt.allocPrint(allocator, "{s}/ledger.json", .{data_dir});
         defer allocator.free(ledger_path);
-        
+
         const journal_path = try std.fmt.allocPrint(allocator, "{s}/journal.log", .{data_dir});
         defer allocator.free(journal_path);
 
@@ -104,23 +104,23 @@ pub const Cli = struct {
         }
 
         const subcommand = args[0];
-        
+
         if (std.mem.eql(u8, subcommand, "create")) {
             if (args.len != 4) {
                 std.debug.print("Usage: account create <name> <type> <currency>\n", .{});
                 return CliError.InvalidArguments;
             }
-            
+
             const name = args[1];
             const type_str = args[2];
             const currency = args[3];
-            
+
             const account_type = std.meta.stringToEnum(account.AccountType, type_str) orelse {
                 std.debug.print("Invalid account type: {s}\n", .{type_str});
                 std.debug.print("Valid types: asset, liability, equity, revenue, expense\n", .{});
                 return CliError.InvalidArguments;
             };
-            
+
             self.ledger.createAccount(name, account_type, currency) catch |err| switch (err) {
                 error.AccountExists => {
                     std.debug.print("Account '{s}' already exists\n", .{name});
@@ -128,20 +128,14 @@ pub const Cli = struct {
                 },
                 else => return err,
             };
-            
+
             std.debug.print("Created {s} account '{s}' with currency {s}\n", .{ type_str, name, currency });
-            
         } else if (std.mem.eql(u8, subcommand, "list")) {
             var iterator = self.ledger.accounts.iterator();
             std.debug.print("Accounts:\n", .{});
             while (iterator.next()) |entry| {
                 const acc = entry.value_ptr;
-                std.debug.print("  {s}: {s} ({s}) - Balance: {d}\n", .{ 
-                    acc.name, 
-                    @tagName(acc.account_type), 
-                    acc.currency, 
-                    acc.balance 
-                });
+                std.debug.print("  {s}: {s} ({s}) - Balance: {d}\n", .{ acc.name, @tagName(acc.account_type), acc.currency, acc.balance });
             }
         } else {
             std.debug.print("Unknown account subcommand: {s}\n", .{subcommand});
@@ -156,21 +150,21 @@ pub const Cli = struct {
         }
 
         const subcommand = args[0];
-        
+
         if (std.mem.eql(u8, subcommand, "add")) {
             var from_account: ?[]const u8 = null;
             var to_account: ?[]const u8 = null;
             var amount: ?i64 = null;
             var currency: ?[]const u8 = null;
             var memo: ?[]const u8 = null;
-            
+
             var i: usize = 1;
             while (i < args.len) : (i += 2) {
                 if (i + 1 >= args.len) break;
-                
+
                 const flag = args[i];
                 const value = args[i + 1];
-                
+
                 if (std.mem.eql(u8, flag, "--from")) {
                     from_account = value;
                 } else if (std.mem.eql(u8, flag, "--to")) {
@@ -186,21 +180,14 @@ pub const Cli = struct {
                     memo = value;
                 }
             }
-            
+
             if (from_account == null or to_account == null or amount == null or currency == null) {
                 std.debug.print("Usage: tx add --from <account> --to <account> --amount <amount> --currency <currency> [--memo <memo>]\n", .{});
                 return CliError.InvalidArguments;
             }
-            
-            var transaction = try tx.Transaction.init(
-                self.allocator,
-                amount.?,
-                currency.?,
-                from_account.?,
-                to_account.?,
-                memo
-            );
-            
+
+            var transaction = try tx.Transaction.init(self.allocator, amount.?, currency.?, from_account.?, to_account.?, memo);
+
             self.ledger.processTransaction(transaction) catch |err| switch (err) {
                 error.FromAccountNotFound => {
                     std.debug.print("From account '{s}' not found\n", .{from_account.?});
@@ -243,13 +230,10 @@ pub const Cli = struct {
                     return;
                 },
             };
-            
+
             try self.journal_ref.append(transaction);
-            
-            std.debug.print("Transaction added: {s} -> {s}: {d} {s}\n", .{
-                from_account.?, to_account.?, amount.?, currency.?
-            });
-            
+
+            std.debug.print("Transaction added: {s} -> {s}: {d} {s}\n", .{ from_account.?, to_account.?, amount.?, currency.? });
         } else {
             std.debug.print("Unknown tx subcommand: {s}\n", .{subcommand});
             return CliError.InvalidCommand;
@@ -261,7 +245,7 @@ pub const Cli = struct {
             std.debug.print("Usage: balance <account>\n", .{});
             return CliError.InvalidArguments;
         }
-        
+
         const account_name = args[0];
         if (self.ledger.getBalance(account_name)) |balance| {
             const acc = self.ledger.getAccount(account_name).?;
@@ -278,12 +262,12 @@ pub const Cli = struct {
         }
 
         const subcommand = args[0];
-        
+
         if (std.mem.eql(u8, subcommand, "verify")) {
             var auditor = audit.Auditor.init(self.allocator);
             var report = try auditor.auditLedger(&self.ledger, &self.journal_ref);
             defer report.deinit(self.allocator);
-            
+
             std.debug.print("Audit Results:\n", .{});
             std.debug.print("  Total Transactions: {d}\n", .{report.total_transactions});
             std.debug.print("  Integrity Valid: {}\n", .{report.integrity_valid});
@@ -292,17 +276,15 @@ pub const Cli = struct {
             std.debug.print("  Duplicate Transactions: {d}\n", .{report.duplicate_transactions.items.len});
             std.debug.print("  Orphaned Transactions: {d}\n", .{report.orphaned_transactions.items.len});
             std.debug.print("  Overall Valid: {}\n", .{report.isValid()});
-            
         } else if (std.mem.eql(u8, subcommand, "report")) {
             var auditor = audit.Auditor.init(self.allocator);
             var report = try auditor.auditLedger(&self.ledger, &self.journal_ref);
             defer report.deinit(self.allocator);
-            
+
             const json = try report.toJson(self.allocator);
             defer self.allocator.free(json);
-            
+
             std.debug.print("{s}\n", .{json});
-            
         } else {
             std.debug.print("Unknown audit subcommand: {s}\n", .{subcommand});
             return CliError.InvalidCommand;
@@ -316,7 +298,7 @@ pub const Cli = struct {
         }
 
         const subcommand = args[0];
-        
+
         if (std.mem.eql(u8, subcommand, "list")) {
             std.debug.print("Journal Entries ({d} total):\n", .{self.journal_ref.entries.items.len});
             for (self.journal_ref.entries.items, 0..) |entry, i| {
@@ -327,17 +309,15 @@ pub const Cli = struct {
                 }
                 std.debug.print("\n", .{});
             }
-            
         } else if (std.mem.eql(u8, subcommand, "export")) {
             if (args.len != 2) {
                 std.debug.print("Usage: journal export <file>\n", .{});
                 return CliError.InvalidArguments;
             }
-            
+
             const filename = args[1];
             try self.journal_ref.saveToFile(filename);
             std.debug.print("Journal exported to {s}\n", .{filename});
-            
         } else {
             std.debug.print("Unknown journal subcommand: {s}\n", .{subcommand});
             return CliError.InvalidCommand;
@@ -347,9 +327,9 @@ pub const Cli = struct {
 
 test "cli initialization" {
     const allocator = std.testing.allocator;
-    
+
     var cli = try Cli.init(allocator, "test_data");
     defer cli.deinit();
-    
+
     std.fs.cwd().deleteTree("test_data") catch {};
 }

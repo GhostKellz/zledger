@@ -1,11 +1,11 @@
 const std = @import("std");
 
 pub const AssetType = enum {
-    native,      // Native ledger asset
-    token,       // Standard token
-    nft,         // Non-fungible token
-    synthetic,   // Derived/synthetic asset
-    stable,      // Stable coin
+    native, // Native ledger asset
+    token, // Standard token
+    nft, // Non-fungible token
+    synthetic, // Derived/synthetic asset
+    stable, // Stable coin
 };
 
 pub const AssetMetadata = struct {
@@ -57,7 +57,7 @@ pub const AssetRule = struct {
         if (self.frozen) {
             return error.AssetFrozen;
         }
-        
+
         if (self.max_transaction_amount) |max| {
             if (amount > max) {
                 return error.TransactionAmountTooLarge;
@@ -71,7 +71,7 @@ pub const Asset = struct {
     asset_type: AssetType,
     metadata: AssetMetadata,
     rules: AssetRule,
-    
+
     pub fn init(allocator: std.mem.Allocator, id: []const u8, asset_type: AssetType, symbol: []const u8, name: []const u8, decimals: u8) !Asset {
         return Asset{
             .id = try allocator.dupe(u8, id),
@@ -228,7 +228,7 @@ test "asset registry creation and validation" {
 
     // Register asset
     try registry.registerAsset(asset);
-    
+
     // Validate asset exists
     try std.testing.expect(registry.isValidAsset("USD"));
     try std.testing.expect(!registry.isValidAsset("EUR"));

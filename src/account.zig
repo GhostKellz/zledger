@@ -128,13 +128,13 @@ pub const Ledger = struct {
         // Create snapshot before processing
         const from_account = self.getAccount(transaction.from_account) orelse return error.FromAccountNotFound;
         const to_account = self.getAccount(transaction.to_account) orelse return error.ToAccountNotFound;
-        
+
         const affected_accounts = [_]*const Account{ from_account, to_account };
         const snapshot = try TransactionSnapshot.init(self.allocator, transaction.id, &affected_accounts);
-        
+
         // Store snapshot
         try self.transaction_snapshots.put(try self.allocator.dupe(u8, transaction.id), snapshot);
-        
+
         // Process transaction normally
         self.processTransaction(transaction) catch |err| {
             // Rollback on failure
@@ -145,19 +145,19 @@ pub const Ledger = struct {
 
     pub fn rollbackTransaction(self: *Ledger, transaction_id: []const u8) !void {
         const snapshot = self.transaction_snapshots.get(transaction_id) orelse return error.SnapshotNotFound;
-        
+
         // Restore account balances
         for (snapshot.account_snapshots) |account_snapshot| {
             if (self.getAccount(account_snapshot.name)) |account| {
                 account.balance = account_snapshot.balance;
             }
         }
-        
+
         // Remove from processed transactions
         if (self.processed_transactions.getPtr(transaction_id)) |_| {
             _ = self.processed_transactions.remove(transaction_id);
         }
-        
+
         std.log.info("Transaction {} rolled back successfully", .{transaction_id});
     }
 

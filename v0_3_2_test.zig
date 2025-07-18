@@ -51,10 +51,10 @@ pub fn main() !void {
 
         // Process parent transaction
         try processed_txs.put("tx_parent", {});
-        
+
         // Test dependent transaction
         const dependent_tx = Transaction{ .id = "tx_child", .amount = 100, .currency = "USD", .depends_on = "tx_parent" };
-        
+
         if (dependent_tx.depends_on) |dep_id| {
             if (processed_txs.contains(dep_id)) {
                 std.debug.print("   ✅ Dependency validation passed\n", .{});
@@ -73,11 +73,11 @@ pub fn main() !void {
             .{ .id = "tx3", .amount = 300, .currency = "USD" },
             .{ .id = "tx4", .amount = 400, .currency = "USD" },
         };
-        
+
         // Simulate Merkle tree batch verification
         const batch_size = transactions.len;
         const batch_integrity = true; // Would be calculated from actual hashes
-        
+
         if (batch_size > 0 and batch_integrity) {
             std.debug.print("   ✅ Merkle tree batch verification structure validated\n", .{});
         }
@@ -89,20 +89,20 @@ pub fn main() !void {
         // Mock account balances
         var alice_balance: i64 = 1000;
         var bob_balance: i64 = 500;
-        
+
         // Snapshot before transaction
         const alice_snapshot = alice_balance;
         const bob_snapshot = bob_balance;
-        
+
         // Process transaction
         const transfer_amount: i64 = 200;
         alice_balance -= transfer_amount;
         bob_balance += transfer_amount;
-        
+
         // Simulate rollback
         alice_balance = alice_snapshot;
         bob_balance = bob_snapshot;
-        
+
         if (alice_balance == 1000 and bob_balance == 500) {
             std.debug.print("   ✅ Transaction rollback system validated\n", .{});
         }
@@ -113,17 +113,17 @@ pub fn main() !void {
     {
         var asset_registry = MockAssetRegistry.init(allocator);
         defer asset_registry.deinit();
-        
+
         // Test normal asset transaction
         asset_registry.validateAssetTransaction("USD", 100) catch |err| {
             std.debug.print("   ❌ Asset validation failed: {}\n", .{err});
             return;
         };
-        
+
         // Test frozen asset
         try asset_registry.freezeAsset("FROZEN_COIN");
         const frozen_result = asset_registry.validateAssetTransaction("FROZEN_COIN", 100);
-        
+
         if (frozen_result == error.AssetFrozen) {
             std.debug.print("   ✅ Multi-asset validation and freezing validated\n", .{});
         }
@@ -135,18 +135,18 @@ pub fn main() !void {
         // Mock audit entry chain
         var chain_entries = std.ArrayList(struct { hash: [32]u8, previous_hash: [32]u8 }).init(allocator);
         defer chain_entries.deinit();
-        
+
         var previous_hash = std.mem.zeroes([32]u8);
-        
+
         // Add mock entries
         for (0..3) |i| {
             var current_hash: [32]u8 = undefined;
             current_hash[0] = @as(u8, @intCast(i + 1)); // Simple mock hash
-            
+
             try chain_entries.append(.{ .hash = current_hash, .previous_hash = previous_hash });
             previous_hash = current_hash;
         }
-        
+
         // Verify chain integrity
         var chain_valid = true;
         var prev = std.mem.zeroes([32]u8);
@@ -157,7 +157,7 @@ pub fn main() !void {
             }
             prev = entry.hash;
         }
-        
+
         if (chain_valid) {
             std.debug.print("   ✅ Cryptographic audit chain integrity validated\n", .{});
         }
@@ -172,13 +172,13 @@ pub fn main() !void {
             gas_used: u64,
             success: bool,
         };
-        
+
         const mock_event = ContractEvent{
             .contract_address = std.mem.zeroes([20]u8),
             .gas_used = 21000,
             .success = true,
         };
-        
+
         if (mock_event.gas_used > 0 and mock_event.success) {
             std.debug.print("   ✅ ZVM integration hooks structure validated\n", .{});
         }
