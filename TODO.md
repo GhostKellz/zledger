@@ -16,7 +16,7 @@
 **Tasks**:
 - [ ] **Merkle Tree for Transaction Batches**
   - Add `src/merkle.zig` for batch transaction verification
-  - Implement Merkle proof generation and validation
+  - Implement Merkle proof generation and validation.
   - Add batch transaction processing with integrity proofs
 - [x] **Transaction Dependency Tracking** ✅ **COMPLETED v0.3.1**
   - ✅ Add `depends_on: ?[]const u8` field to Transaction struct
