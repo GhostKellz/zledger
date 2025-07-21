@@ -12,7 +12,7 @@ GhostChain is a hybrid-layer blockchain system built in **Rust**, with a prototy
 
 * 🔗 **GhostChain (Rust)** – Main L1 blockchain runtime with smart contract VM, ledger, and RPC
 * 🌀 **GhostChain-Z (Zig)** – Lightweight experimental VM with direct `zvm` support
-* 🌉 **GhostBridge** – gRPC bridge to expose contract/DNS/token operations across Zig ↔ Rust
+* 🌉 **GhostBridge** – gRPC bridge to expose contract/DNS/token operations
 
 ## 🔐 Cryptographic Primitives
 
