@@ -1,18 +1,16 @@
-<<<<<<< HEAD
-# Zledger: A Lightweight Ledger Engine in Zig
-
-[![Zig v0.15+](https://img.shields.io/badge/zig-0.15+-f7a41d?logo=zig\&logoColor=white)](https://ziglang.org/)
-=======
 <div align="center">
   <img src="assets/icons/zledger.png" alt="Zledger Logo" width="200">
 </div>
 
 # Zledger: A Lightweight Ledger Engine in Zig
 
-[![Zig v0.16+](https://img.shields.io/badge/zig-0.16.0-dev+-f7a41d?logo=zig\&logoColor=yellow)](https://ziglang.org/)
->>>>>>> 419e038 (added logo, archived zsig for use in zledger)
-[![Pure Zig](https://img.shields.io/badge/pure-zig-success)]()
-[![Ledger Engine](https://img.shields.io/badge/type-ledger-blue)]()
+[![Zig v0.16.0-dev](https://img.shields.io/badge/zig-0.16.0--dev-f7a41d?logo=zig&logoColor=white)](https://ziglang.org/)
+[![Pure Zig](https://img.shields.io/badge/pure-zig-success)](https://github.com/ziglang/zig)
+[![Ledger Engine](https://img.shields.io/badge/type-ledger_engine-blue)](https://en.wikipedia.org/wiki/Ledger)
+[![Double-Entry](https://img.shields.io/badge/accounting-double_entry-orange)](https://en.wikipedia.org/wiki/Double-entry_bookkeeping)
+[![Ed25519 Signatures](https://img.shields.io/badge/crypto-Ed25519-red)](https://ed25519.cr.yp.to/)
+[![Transaction Integrity](https://img.shields.io/badge/integrity-SHA256-purple)](https://en.wikipedia.org/wiki/SHA-2)
+[![Financial Precision](https://img.shields.io/badge/precision-fixed_point-green)]()
 
 ---
 
@@ -32,10 +30,7 @@ Zledger aims to provide the foundational infrastructure for secure balance track
 * ✅ **Supports both single and double-entry models**
 * ✅ **Transaction chaining + integrity hashing**
 * ✅ **Built-in programmable constraints for custom rules**
-<<<<<<< HEAD
-=======
 * ✅ **Cryptographic signing and verification (Zsig integrated)**
->>>>>>> 419e038 (added logo, archived zsig for use in zledger)
 * ✅ **Built for CLI, WASM, or embedded systems**
 
 ---
@@ -104,8 +99,6 @@ zledger audit verify
 zledger balance user2
 ```
 
-<<<<<<< HEAD
-=======
 ### 7. `zledger.crypto` (Integrated Zsig)
 
 Cryptographic signing and verification capabilities from the integrated Zsig library:
@@ -115,17 +108,13 @@ Cryptographic signing and verification capabilities from the integrated Zsig lib
 * Secure transaction authentication
 * Detached and inline signature support
 
->>>>>>> 419e038 (added logo, archived zsig for use in zledger)
 ---
 
 ## 🔐 Security & Precision
 
 * Fixed-point arithmetic using `i64` + `DECIMALS` (e.g. cents or micro-units)
 * Optional SHA256 for integrity chaining of transactions
-<<<<<<< HEAD
-=======
 * Ed25519 cryptographic signing via integrated Zsig functionality
->>>>>>> 419e038 (added logo, archived zsig for use in zledger)
 * No floats, no rounding errors, no surprises
 * Programmable constraints prevent invalid or unauthorized transactions
 
