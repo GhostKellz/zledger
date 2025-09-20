@@ -12,6 +12,7 @@ pub const zwallet_integration = @import("zwallet_integration.zig");
 pub const contract = @import("contract.zig");
 pub const merkle = @import("merkle.zig");
 pub const asset = @import("asset.zig");
+pub const zsig = @import("zsig.zig");
 
 // Comprehensive tests
 test {
@@ -19,6 +20,8 @@ test {
     _ = @import("contract.zig");
     _ = @import("merkle.zig");
     _ = @import("asset.zig");
+    _ = @import("zsig.zig");
+    _ = @import("zsig_integration_test.zig");
 }
 
 pub const Transaction = tx.Transaction;
@@ -41,6 +44,14 @@ pub const HDWallet = zwallet_integration.HDWallet;
 pub const SignatureAlgorithm = zwallet_integration.SignatureAlgorithm;
 pub const Asset = asset.Asset;
 pub const AssetRegistry = asset.AssetRegistry;
+
+// Integrated Zsig Cryptographic Signing
+pub const Keypair = zsig.Keypair;
+pub const Signature = zsig.Signature;
+pub const VerificationResult = zsig.VerificationResult;
+pub const generateKeypair = zsig.generateKeypair;
+pub const signMessage = zsig.signMessage;
+pub const verifySignature = zsig.verifySignature;
 
 // Embedded Smart Contract System
 pub const ContractError = contract.ContractError;

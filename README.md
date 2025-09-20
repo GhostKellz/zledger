@@ -30,7 +30,7 @@ Zledger aims to provide the foundational infrastructure for secure balance track
 * ✅ **Supports both single and double-entry models**
 * ✅ **Transaction chaining + integrity hashing**
 * ✅ **Built-in programmable constraints for custom rules**
-* ✅ **Cryptographic signing and verification (Zsig integrated)**
+* ✅ **Cryptographic signing and verification (Zsig fully integrated)**
 * ✅ **Built for CLI, WASM, or embedded systems**
 
 ---
@@ -99,14 +99,17 @@ zledger audit verify
 zledger balance user2
 ```
 
-### 7. `zledger.crypto` (Integrated Zsig)
+### 7. `zledger.zsig` (Integrated Zsig)
 
-Cryptographic signing and verification capabilities from the integrated Zsig library:
+Cryptographic signing and verification capabilities from the fully integrated Zsig library:
 
 * Ed25519 transaction signing and verification
-* Keypair generation and management
-* Secure transaction authentication
+* Public/private keypair generation and management
+* Secure transaction authentication and integrity
 * Detached and inline signature support
+* Deterministic signing for audit trails
+* Challenge-response authentication
+* Token and JWT signing capabilities
 
 ---
 
@@ -131,11 +134,17 @@ Cryptographic signing and verification capabilities from the integrated Zsig lib
 
 ---
 
+## ✅ Recently Integrated
+
+* **Zsig cryptographic signing library fully integrated** with CLI commands:
+  - `zledger keygen [--out <keyfile>]` - Generate Ed25519 keypairs
+  - `zledger sign --in <file> --key <keyfile>` - Sign files (implementation ready)
+  - `zledger verify --in <file> --sig <sigfile>` - Verify signatures (implementation ready)
+
 ## 🛠 Future Extensions
 
 * Plugin hooks for syncing with Zwallet
 * Zcash-style memo field support
-* Zsig-compatible signing of transactions
 * Export formats: CSV, JSON, and Merkle-tree snapshots
 * Pluggable scripting/interpreter for advanced rule logic
 

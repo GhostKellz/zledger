@@ -3,6 +3,7 @@ const tx = @import("tx.zig");
 const account = @import("account.zig");
 const journal = @import("journal.zig");
 const audit = @import("audit.zig");
+const zsig = @import("zsig.zig");
 
 pub const CliError = error{
     InvalidCommand,
@@ -67,6 +68,12 @@ pub const Cli = struct {
             try self.handleAuditCommand(cmd_args);
         } else if (std.mem.eql(u8, command, "journal")) {
             try self.handleJournalCommand(cmd_args);
+        } else if (std.mem.eql(u8, command, "keygen")) {
+            try self.handleKeygenCommand(cmd_args);
+        } else if (std.mem.eql(u8, command, "sign")) {
+            try self.handleSignCommand(cmd_args);
+        } else if (std.mem.eql(u8, command, "verify")) {
+            try self.handleVerifyCommand(cmd_args);
         } else {
             std.debug.print("Unknown command: {s}\n", .{command});
             try self.printUsage();
@@ -90,6 +97,9 @@ pub const Cli = struct {
             \\  audit report                             Generate audit report
             \\  journal list                             List all transactions
             \\  journal export <file>                    Export journal to file
+            \\  keygen [--out <keyfile>]                 Generate new cryptographic keypair
+            \\  sign --in <file> --key <keyfile>         Sign a file
+            \\  verify --in <file> --sig <sigfile>       Verify a signature
             \\
             \\Account Types: asset, liability, equity, revenue, expense
             \\
@@ -322,6 +332,96 @@ pub const Cli = struct {
             std.debug.print("Unknown journal subcommand: {s}\n", .{subcommand});
             return CliError.InvalidCommand;
         }
+    }
+
+    fn handleKeygenCommand(self: *Cli, args: []const [:0]u8) !void {
+        _ = self;
+
+        var output_file: ?[]const u8 = null;
+
+        // Parse arguments
+        var i: usize = 0;
+        while (i < args.len) : (i += 1) {
+            if (std.mem.eql(u8, args[i], "--out") and i + 1 < args.len) {
+                output_file = args[i + 1];
+                i += 1; // Skip the next argument
+            }
+        }
+
+        // Generate keypair
+        const allocator = std.heap.page_allocator;
+        const keypair = try zsig.generateKeypair(allocator);
+
+        if (output_file) |file| {
+            // Save to file
+            const bundle = try keypair.exportBundle(allocator);
+            defer allocator.free(bundle);
+
+            try std.fs.cwd().writeFile(.{ .sub_path = file, .data = bundle });
+            std.debug.print("Keypair saved to {s}\n", .{file});
+        } else {
+            // Print to stdout
+            const pub_hex = try keypair.publicKeyHex(allocator);
+            defer allocator.free(pub_hex);
+
+            std.debug.print("Generated keypair:\n", .{});
+            std.debug.print("Public key: {s}\n", .{pub_hex});
+            std.debug.print("(Use --out <file> to save the full keypair securely)\n", .{});
+        }
+    }
+
+    fn handleSignCommand(self: *Cli, args: []const [:0]u8) !void {
+        _ = self;
+
+        var input_file: ?[]const u8 = null;
+        var key_file: ?[]const u8 = null;
+
+        // Parse arguments
+        var i: usize = 0;
+        while (i < args.len) : (i += 1) {
+            if (std.mem.eql(u8, args[i], "--in") and i + 1 < args.len) {
+                input_file = args[i + 1];
+                i += 1;
+            } else if (std.mem.eql(u8, args[i], "--key") and i + 1 < args.len) {
+                key_file = args[i + 1];
+                i += 1;
+            }
+        }
+
+        if (input_file == null or key_file == null) {
+            std.debug.print("Usage: sign --in <file> --key <keyfile>\n", .{});
+            return CliError.InvalidArguments;
+        }
+
+        std.debug.print("Signing functionality requires key loading implementation\n", .{});
+        std.debug.print("Input: {s}, Key: {s}\n", .{ input_file.?, key_file.? });
+    }
+
+    fn handleVerifyCommand(self: *Cli, args: []const [:0]u8) !void {
+        _ = self;
+
+        var input_file: ?[]const u8 = null;
+        var sig_file: ?[]const u8 = null;
+
+        // Parse arguments
+        var i: usize = 0;
+        while (i < args.len) : (i += 1) {
+            if (std.mem.eql(u8, args[i], "--in") and i + 1 < args.len) {
+                input_file = args[i + 1];
+                i += 1;
+            } else if (std.mem.eql(u8, args[i], "--sig") and i + 1 < args.len) {
+                sig_file = args[i + 1];
+                i += 1;
+            }
+        }
+
+        if (input_file == null or sig_file == null) {
+            std.debug.print("Usage: verify --in <file> --sig <sigfile>\n", .{});
+            return CliError.InvalidArguments;
+        }
+
+        std.debug.print("Verification functionality requires signature loading implementation\n", .{});
+        std.debug.print("Input: {s}, Signature: {s}\n", .{ input_file.?, sig_file.? });
     }
 };
 
