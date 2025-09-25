@@ -12,6 +12,12 @@
 [![Transaction Integrity](https://img.shields.io/badge/integrity-SHA256-purple)](https://en.wikipedia.org/wiki/SHA-2)
 [![Financial Precision](https://img.shields.io/badge/precision-fixed_point-green)]()
 
+## DISCLAIMER
+
+⚠️ **EXPERIMENTAL LIBRARY - FOR LAB/PERSONAL USE** ⚠️
+
+This is an experimental library under active development. It is intended for research, learning, and personal projects. The API is subject to change!
+
 ---
 
 ## 📌 Overview
