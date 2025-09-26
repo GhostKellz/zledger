@@ -17,13 +17,27 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
-    // It's also possible to define more custom flags to toggle optional features
-    // of this build script using `b.option()`. All defined flags (including
-    // target and optimize options) will be listed when running `zig build --help`
-    // in this directory.
 
-    // Get zcrypto dependency
-    const zcrypto = b.dependency("zcrypto", .{});
+    // Build configuration options
+    const enable_zsig = b.option(bool, "zsig", "Enable Zsig cryptographic signing functionality (default: true)") orelse true;
+    const enable_ledger = b.option(bool, "ledger", "Enable core ledger functionality (default: true)") orelse true;
+    const enable_contracts = b.option(bool, "contracts", "Enable smart contract functionality (default: true)") orelse true;
+    const enable_crypto_storage = b.option(bool, "crypto-storage", "Enable encrypted storage functionality (default: true)") orelse true;
+    const enable_wallet_integration = b.option(bool, "wallet", "Enable wallet integration functionality (default: true)") orelse true;
+
+    // Get zcrypto dependency - only fetch if crypto functionality is needed
+    const zcrypto = if (enable_zsig or enable_crypto_storage or enable_wallet_integration)
+        b.dependency("zcrypto", .{})
+    else
+        null;
+
+    // Create build options
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "enable_zsig", enable_zsig);
+    build_options.addOption(bool, "enable_ledger", enable_ledger);
+    build_options.addOption(bool, "enable_contracts", enable_contracts);
+    build_options.addOption(bool, "enable_crypto_storage", enable_crypto_storage);
+    build_options.addOption(bool, "enable_wallet_integration", enable_wallet_integration);
 
     // This creates a module, which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
@@ -32,6 +46,7 @@ pub fn build(b: *std.Build) void {
     // to our consumers. We must give it a name because a Zig package can expose
     // multiple modules and consumers will need to be able to specify which
     // module they want to access.
+
     const mod = b.addModule("zledger", .{
         // The root source file is the "entry point" of this module. Users of
         // this module will only be able to access public declarations contained
@@ -43,8 +58,11 @@ pub fn build(b: *std.Build) void {
         // Later on we'll use this module as the root module of a test executable
         // which requires us to specify a target.
         .target = target,
-        .imports = &.{
-            .{ .name = "zcrypto", .module = zcrypto.module("zcrypto") },
+        .imports = if (zcrypto) |crypto_dep| &.{
+            .{ .name = "build_options", .module = build_options.createModule() },
+            .{ .name = "zcrypto", .module = crypto_dep.module("zcrypto") },
+        } else &.{
+            .{ .name = "build_options", .module = build_options.createModule() },
         },
     });
 
@@ -79,14 +97,16 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             // List of modules available for import in source files part of the
             // root module.
-            .imports = &.{
+            .imports = if (zcrypto) |crypto_dep| &.{
                 // Here "zledger" is the name you will use in your source code to
                 // import this module (e.g. `@import("zledger")`). The name is
                 // repeated because you are allowed to rename your imports, which
                 // can be extremely useful in case of collisions (which can happen
                 // importing modules from different packages).
                 .{ .name = "zledger", .module = mod },
-                .{ .name = "zcrypto", .module = zcrypto.module("zcrypto") },
+                .{ .name = "zcrypto", .module = crypto_dep.module("zcrypto") },
+            } else &.{
+                .{ .name = "zledger", .module = mod },
             },
         }),
     });

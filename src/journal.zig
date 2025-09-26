@@ -1,8 +1,9 @@
 const std = @import("std");
 const tx = @import("tx.zig");
 const crypto = std.crypto;
-const crypto_storage = @import("crypto_storage.zig");
-const zcrypto = @import("zcrypto");
+const build_options = @import("build_options");
+const crypto_storage = if (build_options.enable_crypto_storage) @import("crypto_storage.zig") else struct {};
+const zcrypto = if (build_options.enable_zsig or build_options.enable_crypto_storage or build_options.enable_wallet_integration) @import("zcrypto") else struct {};
 
 pub const JournalEntry = struct {
     transaction: tx.Transaction,
@@ -23,7 +24,10 @@ pub const JournalEntry = struct {
 
     pub fn verify(self: JournalEntry, allocator: std.mem.Allocator) !bool {
         const expected_hash = try calculateEntryHash(allocator, self.transaction, self.prev_hash, self.sequence);
-        return zcrypto.util.constantTimeCompare(&self.hash, &expected_hash);
+        return if (build_options.enable_zsig or build_options.enable_crypto_storage or build_options.enable_wallet_integration)
+            zcrypto.util.constantTimeCompare(&self.hash, &expected_hash)
+        else
+            std.mem.eql(u8, &self.hash, &expected_hash);
     }
 };
 

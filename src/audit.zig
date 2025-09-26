@@ -1,9 +1,11 @@
 const std = @import("std");
+const crypto = std.crypto;
 const tx = @import("tx.zig");
 const account = @import("account.zig");
 const journal = @import("journal.zig");
 const asset = @import("asset.zig");
-const zcrypto = @import("zcrypto");
+const build_options = @import("build_options");
+const zcrypto = if (build_options.enable_zsig or build_options.enable_crypto_storage or build_options.enable_wallet_integration) @import("zcrypto") else struct {};
 
 pub const AuditReport = struct {
     timestamp: i64,
@@ -106,7 +108,14 @@ pub const Auditor = struct {
     pub fn init(allocator: std.mem.Allocator) Auditor {
         return Auditor{
             .allocator = allocator,
-            .audit_key = zcrypto.rand.generateKey(32),
+            .audit_key = if (build_options.enable_zsig or build_options.enable_crypto_storage or build_options.enable_wallet_integration)
+                zcrypto.rand.generateKey(32)
+            else
+                blk: {
+                    var key: [32]u8 = undefined;
+                    crypto.random.bytes(&key);
+                    break :blk key;
+                },
         };
     }
 

@@ -1,6 +1,7 @@
 const std = @import("std");
 const crypto = std.crypto;
-const zcrypto = @import("zcrypto");
+const build_options = @import("build_options");
+const zcrypto = if (build_options.enable_zsig or build_options.enable_crypto_storage or build_options.enable_wallet_integration) @import("zcrypto") else struct {};
 
 pub const Transaction = struct {
     id: []const u8,
@@ -39,7 +40,11 @@ pub const Transaction = struct {
         const id = try generateTxId(allocator, timestamp, from_account, to_account, amount);
 
         var nonce: [12]u8 = undefined;
-        zcrypto.rand.fillBytes(&nonce);
+        if (build_options.enable_zsig or build_options.enable_crypto_storage or build_options.enable_wallet_integration) {
+            zcrypto.rand.fillBytes(&nonce);
+        } else {
+            crypto.random.bytes(&nonce);
+        }
 
         return Transaction{
             .id = id,

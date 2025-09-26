@@ -22,22 +22,23 @@ This is an experimental library under active development. It is intended for res
 
 ## 📌 Overview
 
-**Zledger** is a lightweight, performant, and embeddable ledger engine built in Zig. It's designed for use in financial applications, cryptocurrency accounting, blockchain wallets, and local transactional systems where performance and precision matter.
+**Zledger v0.5.0** is a lightweight, performant, and modular ledger engine built in Zig. It's designed for use in financial applications, cryptocurrency accounting, blockchain wallets, distributed systems, and local transactional systems where performance and precision matter.
 
-Zledger aims to provide the foundational infrastructure for secure balance tracking, transaction journaling, double-entry accounting, audit-ready systems, and programmable transaction constraints ("covenants")—now built directly into the engine.
+Zledger provides foundational infrastructure for secure balance tracking, transaction journaling, double-entry accounting, audit-ready systems, smart contracts, and programmable transaction constraints—with flexible build options to include only what you need.
 
 ---
 
 ## 🎯 Goals
 
-* ✅ **Minimal yet powerful ledger engine**
-* ✅ **No external dependencies** — just Zig and stdlib
+* ✅ **Modular architecture** — use only what you need via build flags
+* ✅ **Minimal external dependencies** — uses modular zcrypto when crypto features enabled
 * ✅ **Precision-first with no floating point leakage**
 * ✅ **Supports both single and double-entry models**
-* ✅ **Transaction chaining + integrity hashing**
-* ✅ **Built-in programmable constraints for custom rules**
+* ✅ **Transaction chaining + integrity hashing with Merkle trees**
+* ✅ **Built-in smart contracts and programmable constraints**
 * ✅ **Cryptographic signing and verification (Zsig fully integrated)**
-* ✅ **Built for CLI, WASM, or embedded systems**
+* ✅ **Identity-aware transactions for distributed systems**
+* ✅ **Built for CLI, WASM, embedded, or distributed systems**
 
 ---
 
@@ -140,12 +141,57 @@ Cryptographic signing and verification capabilities from the fully integrated Zs
 
 ---
 
-## ✅ Recently Integrated
+## 🚀 What's New in v0.5.0
 
-* **Zsig cryptographic signing library fully integrated** with CLI commands:
-  - `zledger keygen [--out <keyfile>]` - Generate Ed25519 keypairs
-  - `zledger sign --in <file> --key <keyfile>` - Sign files (implementation ready)
-  - `zledger verify --in <file> --sig <sigfile>` - Verify signatures (implementation ready)
+* **Modular Build System** - Choose which components to include:
+  - `--ledger` - Core ledger functionality (default: true)
+  - `--zsig` - Cryptographic signing (default: true)
+  - `--contracts` - Smart contract execution (default: true)
+  - `--crypto-storage` - Encrypted storage (default: true)
+  - `--wallet` - Wallet integration (default: true)
+
+* **Updated Modular Zcrypto** - Latest zcrypto library with feature flags
+* **Smart Contracts** - Embedded contract execution with gas metering
+* **Distributed System Support** - Identity-aware transactions and journal replay
+* **Enhanced Documentation** - Comprehensive docs/ and examples/ directories
+* **Keystone Integration** - Ready for integration with Keystone execution layer
+
+## 📦 Installation & Build
+
+### As a Zig Dependency
+
+```bash
+zig fetch --save https://github.com/ghostkellz/zledger/archive/refs/heads/main.tar.gz
+```
+
+Then in your `build.zig`:
+```zig
+const zledger = b.dependency("zledger", .{});
+exe.root_module.addImport("zledger", zledger.module("zledger"));
+```
+
+### Build Configurations
+
+```bash
+# Full build with all features (default)
+zig build
+
+# Minimal ledger only
+zig build -Dledger=true -Dzsig=false -Dcontracts=false -Dcrypto-storage=false -Dwallet=false
+
+# Cryptographic features only
+zig build -Dledger=false -Dzsig=true -Dcrypto-storage=true -Dwallet=false -Dcontracts=false
+
+# Smart contracts with ledger
+zig build -Dledger=true -Dcontracts=true -Dzsig=false -Dcrypto-storage=false -Dwallet=false
+```
+
+## 📚 Documentation
+
+* [Quick Start Guide](docs/quick-start.md)
+* [Build Configuration](docs/build-configuration.md)
+* [Examples](examples/)
+* [Keystone Integration](KEYSTONE.md)
 
 ## 🛠 Future Extensions
 
